@@ -2,15 +2,19 @@ from selenium import webdriver
 import time
 import re
 import pandas as pd
+import re
 
 
 class Dou_yu(object):
 
-    def __init__(self):
-        self.url = 'https://www.douyu.com/g_wzry'
+    def __init__(self, url, name):
+        self.url = url
+        self.name = name
+        self.path = './' + self.name + '.xlsx'
         self.driver = webdriver.Chrome("H:\Google\Chrome\Application\chromedriver.exe")
         self.headers = ['房间号', '标题', '主播名', '主播称号', '热度', '分区']
         self.page = 1
+
     def parse_data(self):
         # 建议加上这个休眠，不然可能会因为网速问题，导致页面未加载完毕，爬取失败
         time.sleep(1)
@@ -20,15 +24,36 @@ class Dou_yu(object):
         data_list = []
         for room in room_list:
             tmp = []
-            tmp.append(re.sub(r'.*/', '', room.find_element('xpath', './a').get_attribute('href')))
-            tmp.append(room.find_element('xpath', './a/div[2]/div[1]/h3').get_attribute('textContent'))
-            tmp.append(room.find_element('xpath', './a/div[2]/div[2]/h2/div').get_attribute('textContent'))
-            tmp.append(room.find_element('xpath', './a/div[2]/span').get_attribute('textContent'))
-            tmp.append(room.find_element('xpath', './a/div[2]/div[2]/span').get_attribute('textContent'))
-            tmp.append(room.find_element('xpath', './a/div[2]/div[1]/span').get_attribute('textContent'))
+            try:
+                tmp.append(re.sub(r'.*/', '', room.find_element('xpath', './a').get_attribute('href'))) #//*[@id="listAll"]/div[2]/ul/li[1]/div/a/div[2]/div[1]/h3
+            except:
+                tmp.append('error')
+            try:
+                tmp.append(room.find_element('xpath', './a/div[2]/div[1]/h3').get_attribute('textContent'))  # //*[@id="listAll"]/div[2]/ul/li[1]/div/a/div[2]/div[1]/h3
+            except:
+                tmp.append('error')
+            try:
+                tmp.append(room.find_element('xpath', './a/div[2]/div[2]/h2/div[1]').get_attribute('textContent'))
+            except:
+                tmp.append('error')
+            try:
+                tmp.append(room.find_element('xpath', './a/div[2]/span').get_attribute('textContent'))
+            except:
+                tmp.append('error')
+            try:
+                number_str = room.find_element('xpath', './a/div[2]/div[2]/span').get_attribute('textContent')
+                if re.match('.*万', number_str):
+                    number_str = int(float(number_str.strip('万')) * 10000)
+                tmp.append(number_str)
+            except:
+                tmp.append('error')
+            try:
+                tmp.append(room.find_element('xpath', './a/div[2]/div[1]/span').get_attribute('textContent'))
+            except:
+                tmp.append('error')
             data_list.append(tmp)
-        print('爬完了第' + str(self.page) + '页')
-        self.page +=1
+        print(self.name + str(self.page) + '页')
+        self.page += 1
         return data_list
 
     def save_data(self, data_list):
@@ -36,14 +61,16 @@ class Dou_yu(object):
         # data_list = str(data_list)
         # with open('斗鱼.txt', 'a', encoding='utf-8') as f:
         #     f.write(data_list + '\n')
-        df = pd.read_excel('./直播间信息.xlsx')
+        df = pd.read_excel(self.path)
         for data in data_list:
             df = pd.concat([df, pd.DataFrame([data], columns=self.headers)], ignore_index=True)
-        df.to_excel('./直播间信息.xlsx', index=False)
+        df.to_excel(self.path, index=False)
+
     def run(self):
         df = pd.DataFrame(columns=self.headers)
-        df.to_excel('./直播间信息.xlsx', index=False)
+        df.to_excel(self.path, index=False)
         self.driver.get(self.url)
+        time.sleep(3)
         # url
         # 创建driver
         # 发送get
@@ -64,8 +91,12 @@ class Dou_yu(object):
                 break
             # 找到下一页按钮并点击
             self.driver.find_element('xpath', '//span[contains(text(),"下一页")]').click()
+        self.driver.close()
 
 
 if __name__ == '__main__':
-    dou_yu = Dou_yu()
-    dou_yu.run()
+    yz = Dou_yu('https://www.douyu.com/g_yz', '颜值')
+    # yz_h = Dou_yu('https://www.douyu.com/g_XX', '颜值横屏')
+    yz.run()
+    # yz_h.run()
+    print('爬取结束')
